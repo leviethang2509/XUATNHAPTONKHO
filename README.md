@@ -32,7 +32,7 @@
 | 22 | `NgaySua` | `NULL` | Không lấy từ bảng báo cáo |
 | 23 | `DonViId` | `@iDonViId` | Truyền thẳng |
 | 24 | `PhongBanId` | `@iPhongBanId` | Truyền thẳng |
-| 25 | `IsXacNhan` | `0` (gán cứng) | Từng row không xác nhận riêng |
+| 25 | `IsXacNhan` | CTE `XACNHAN_THEO_LOAITHAN` kiểm tra từng phiếu | `1` nếu tất cả phiếu (01VT,02VT,03VT,04VT) của loại than đó trong kỳ đều đã được xác nhận |
 | 26 | `TuNgay` | `@iTuNgay` | Truyền thẳng |
 | 27 | `DenNgay` | `@iDenNgay` | Truyền thẳng |
 
@@ -72,7 +72,7 @@
 | 28 | `XuatCheBienTu_TNK_NhapMua` | `CAST(0 AS FLOAT)` | Chưa có phiếu nghiệp vụ |
 | 29 | `XuatCheBienTu_TNK_NhapMua_AK` | `CAST(0 AS FLOAT)` | Chưa có nguồn AK tương ứng |
 | 30 | `NhapKhac` | `CAST(0 AS FLOAT)` | Chưa có phiếu nghiệp vụ nhập khác |
-| 31 | `IsXacNhan` (từng row) | `CAST(0 AS BIT)` | Chỉ có xác nhận tổng thể grid, không theo từng loại than |
+| 31 | `IsXacNhan` (từng row) | Có công thức, không còn gán `0` | Đã tính theo `XACNHAN_THEO_LOAITHAN`, dựa trên xác nhận phiếu theo từng loại than |
 
 ---
 
@@ -88,6 +88,7 @@
 | `TONDAUKY` | Tồn đầu kỳ lượng thường + tồn đầu kỳ AK | Tổng hợp từ 5 CTE trên |
 | `DANHMUCLOAITHAN` | Phát sinh trong kỳ từ 4 phiếu, gồm cả lượng thường và AK | 01VT, 02VT, 03VT, 04VT |
 | `DANHMUCLOAITHAN_AGG` | Gộp tổng theo `Id, TenGoi, NhomId` sau `UNION ALL` | `SUM(...) GROUP BY ...` |
+| `XACNHAN_THEO_LOAITHAN` | Tính xác nhận theo từng loại than | Kiểm tra 4 nhóm phiếu 01VT, 02VT, 03VT, 04VT trong kỳ |
 
 ---
 
