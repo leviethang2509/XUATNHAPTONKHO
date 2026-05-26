@@ -1,54 +1,81 @@
-# 📑 TÀI LIỆU CÔNG THỨC XỬ LÝ DỮ LIỆU TRÊN TỪNG FIELD
-**Hệ thống:** CBT_QUANGNINH  
-**Nghiệp vụ:** Báo cáo Xuất - Nhập - Tồn kho than theo tháng (Cấu trúc rút gọn các cột hiển thị)
+# 📑 BÁO CÁO PHÂN TÍCH LOGIC DỮ LIỆU & CÔNG THỨC STORED PROCEDURE
+**Nghiệp vụ:** Báo cáo Xuất - Nhập - Tồn kho than theo tháng
+**Thủ tục:** `sp_BAOCAOXUATNHAPTON_THEOTHANG_GetListPaging`
 
 ---
 
-## I. Nguyên Tắc Tính Xích-Ma (Bình Quân Gia Quyền)
-Đối với các chỉ số chất lượng than (AK%, Vk%, Qk), hệ thống không dùng hàm trung bình cộng (AVG) đơn thuần mà bắt buộc áp dụng công thức **Bình quân gia quyền theo sản lượng ngày/phiếu** để đảm bảo tính cân đối chính xác tuyệt đối:
+## I. Khối Thông Tin Chung & Đầu Kỳ (Kế Thừa Hệ Thống)
+Các trường thông tin nền của chủng loại than và số liệu tồn kho được kế thừa từ danh mục gốc và bảng lưu trữ dữ liệu lịch sử chốt của tháng trước.
 
-* **Công thức tổng quát:** Chỉ số bình quân = [Tổng_Tổng(Khối lượng phiếu * Chỉ số chất lượng phiếu)] / Tổng khối lượng kỳ báo cáo
-
----
-
-## II. Bảng Tra Cứu Công Thức & Nguồn Dữ Liệu Trên Từng Field
-
-| STT | Tên Field Hệ Thống | Mô Tả Giao Diện | Nguồn Dữ Liệu Gốc / Công Thức SQL | Ghi Chú |
-| :---: | :--- | :--- | :--- | :--- |
-| **1** | `TenLoaiThan` | Tên loại than | `dbo.DM_LOAITHAN.TenGoi` | Trục danh mục chủng loại than chính |
-| **2** | `TonDauKy` | Tồn đầu kỳ (Tấn) | `dbo.BAOCAOXUATNHAPTON_THEOTHANG.TonCuoiKy` | Lấy từ dữ liệu chốt của **Tháng trước** |
-| **3** | `TonDauKy_AK` | AK % đầu kỳ | `dbo.BAOCAOXUATNHAPTON_THEOTHANG.TonCuoiKy_AK` | Lấy từ dữ liệu chốt của **Tháng trước** |
-| **4** | `TonDauKy_Vk` | Vk % đầu kỳ | `dbo.BAOCAOXUATNHAPTON_THEOTHANG.TonCuoiKy_Vk` | Lấy từ dữ liệu chốt của **Tháng trước** |
-| **5** | `NhapMua` | Nhập mua | `SUM(ct.SoLuongThucNhap)` từ phiếu `01VT` | Chỉ lấy các phiếu thuộc kỳ báo cáo |
-| **6** | `NhapMua_AK` | AK % Nhập mua | `SUM(SoLuongThucNhap * ChatLuongAk) / NhapMua` | Gia quyền từ chi tiết `01VT_CHITIET` |
-| **7** | `NhapMua_Vk` | Vk % Nhập mua | `SUM(SoLuongThucNhap * V_PhanTram) / NhapMua` | Gia quyền từ chi tiết `01VT_CHITIET` |
-| **8** | `NhapNoiBo` | Nhập nội bộ | `SUM(ct.SoLuongTheoAmThucTe)` từ phiếu `01VT` | Điều kiện: Có liên kết với `LENHNHAPKHOTHANNOIBO` |
-| **9** | `NhapNoiBo_AK` | AK % Nhập nội bộ | `SUM(SoLuongTheoAmThucTe * ChatLuongAk) / NhapNoiBo` | Gia quyền theo lượng ẩm thực tế |
-| **10** | `NhapPhaTron` | Nhập pha trộn | `SUM(ct.SoLuongThucNhap)` từ `PHIEUNHAPKHO` | Lọc theo cờ chế biến: `IsCheBien = 0` |
-| **11** | `NhapPhaTron_AK` | AK % Nhập pha trộn | `SUM(SoLuongThucNhap * ChatLuongAK) / NhapPhaTron` | Lấy từ chi tiết `PHIEUNHAPKHO_HANGHOA` |
-| **12** | `TongNhap` | **Tổng nhập tháng** | `= NhapMua + NhapNoiBo + NhapPhaTron` | Tổng khối lượng của 3 luồng nhập hiển thị |
-| **13** | `TongNhap_AK` | **AK % Tổng nhập** | `= (NhapMua * NhapMua_AK + NhapNoiBo * NhapNoiBo_AK + NhapPhaTron * NhapPhaTron_AK) / TongNhap` | Trả về `0` nếu `TongNhap = 0` |
-| **14** | `TongNhap_Vk` | **Vk % Tổng nhập** | `= (NhapMua * NhapMua_Vk) / TongNhap` | Cân đối chất bốc theo luồng nhập mua chính |
-| **15** | `XuatBan` | Xuất bán | `SUM(ct.SoLuongThucXuat)` từ phiếu `02VT` | Quét từ chi tiết xuất kho tiêu thụ |
-| **16** | `XuatBan_AK` | AK % Xuất bán | `SUM(SoLuongThucXuat * ChatLuongAk) / XuatBan` | Gia quyền chất lượng từ chi tiết phiếu `02VT` |
-| **17** | `XuatBan_Qk` | Qk (Cal/g) Xuất bán| `SUM(SoLuongThucXuat * QKCal) / XuatBan` | Chỉ số nhiệt trị gia quyền của than tiêu thụ |
-| **18** | `XuatBan_Vk` | Vk % Xuất bán | `SUM(SoLuongThucXuat * V_PhanTram) / XuatBan` | Chỉ số chất bốc gia quyền của than tiêu thụ |
-| **19** | `XuatPhaTron` | Xuất pha trộn | `SUM(ct.SoLuongThucNhap)` từ `PHIEUXUATKHO` | Khối lượng than nền đưa vào máy pha trộn |
-| **20** | `XuatPhaTron_AK` | AK % Xuất pha trộn | `SUM(SoLuongThucNhap * ChatLuongAK) / XuatPhaTron` | Lấy từ chi tiết `PHIEUXUATKHO_HANGHOA` |
-| **21** | `TongXuat` | **Tổng xuất tháng** | `= XuatBan + XuatPhaTron` | Tổng khối lượng của 2 luồng xuất hiển thị |
-| **22** | `TongXuat_AK` | **AK % Tổng xuất** | `= (XuatBan * XuatBan_AK + XuatPhaTron * XuatPhaTron_AK) / TongXuat` | Trả về `0` nếu `TongXuat = 0` |
-| **23** | `TongXuat_Vk` | **Vk % Tổng xuất** | `= (XuatBan * XuatBan_Vk) / TongXuat` | Cân đối chất bốc theo luồng xuất tiêu thụ chính |
-| **24** | `TonCuoiKy` | **Tồn cuối kỳ** | `= TonDauKy + TongNhap - TongXuat` | **Phương trình cân đối kho cốt lõi** |
-| **25** | `TonCuoiKy_AK` | **AK % Tồn cuối kỳ** | `= (TonDauKy * TonDauKy_AK + TongNhap * TongNhap_AK - TongXuat * TongXuat_AK) / TonCuoiKy` | Trả về `0` nếu `TonCuoiKy = 0` |
-| **26** | `TonCuoiKy_Vk` | **Vk % Tồn cuối kỳ** | `= (TonDauKy * TonDauKy_Vk + TongNhap * TongNhap_Vk - TongXuat * TongXuat_Vk) / TonCuoiKy` | Trả về `0` nếu `TonCuoiKy = 0` |
+| Tên Field | Tên Cột Hiển Thị | Bảng Dữ Liệu Nguồn | Công Thức / Logic Xử Lý Trong SQL |
+| :--- | :--- | :--- | :--- |
+| `LoaiThanId` | Khóa chủng loại | `dbo.DM_LOAITHAN` | Khóa chính `Id` của loại than (Dùng để `JOIN` các nhánh dữ liệu). |
+| `TenLoaiThan` | Tên loại than | `dbo.DM_LOAITHAN` | `lt.TenGoi` (Lọc theo `@iTextSearch` và sắp xếp mặc định). |
+| `TonDauKy` | Tồn đầu kỳ (Tấn) | `dbo.BAOCAOXUATNHAPTON_THEOTHANG` | `ISNULL(tdk.TonCuoiKy, 0)` của tháng trước. |
+| `TonDauKy_AK` | AK % đầu kỳ | `dbo.BAOCAOXUATNHAPTON_THEOTHANG` | `ISNULL(tdk.TonCuoiKy_AK, 0)` chất lượng tro chốt tháng trước. |
+| `TonDauKy_Vk` | Vk % đầu kỳ | `dbo.BAOCAOXUATNHAPTON_THEOTHANG` | `ISNULL(tdk.TonCuoiKy_Vk, 0)` chất bốc chốt tháng trước. |
 
 ---
 
-## III. Các Tham Số Đầu Ra Hệ Thống (Output Parameters)
+## II. Khối Nhập Trong Kỳ (Dữ Liệu Phát Sinh Đầu Vào)
+Dữ liệu khối này được tổng hợp từ các nghiệp vụ Nhập kho thương mại (`01VT`) và Nhập kho thành phẩm chế biến pha trộn nội bộ.
 
-Mục tiêu phục vụ phân trang, hiển thị trạng thái động và bóc tách chuỗi ID trên giao diện Kendo Grid:
+### 1. Nhánh Nhập mua & Nhập nội bộ (Từ CTE `NHAP_01VT`)
+* **Bảng nguồn chính:** `dbo.PHIEUNHAPKHOTHAN_01VT` (phieu) `INNER JOIN` `dbo.PHIEUNHAPKHOTHAN_01VT_CHITIET` (ct)
+* **Bảng điều kiện liên kết nội bộ:** `LEFT JOIN dbo.LENHNHAPKHOTHANNOIBO` (lenhNoiBo)
 
-1. **`@oTotalRow` (Tổng số dòng):** Đếm số lượng các chủng loại than có phát sinh dữ liệu thực tế trong kỳ báo cáo để render phân trang grid.
-2. **`@oIds` (Chuỗi ID tổng hợp):** Gom toàn bộ khóa chính `Id` của tất cả các phiếu nhập/xuất kho phát sinh trong tháng (`01VT`, `02VT`, `PHIEUNHAPKHO`, `PHIEUXUATKHO`) lại thành một chuỗi duy nhất, phân tách bằng dấu chấm phẩy `;`. Chuỗi này phục vụ nút chốt/hủy xác nhận đồng loạt dưới Client.
-3. **`@oIsXacNhanGrid` (Cờ trạng thái tổng):** * Nếu **Tổng số lượng phiếu phát sinh trong tháng** bằng đúng **Tổng số lượng phiếu đã được chốt sổ (`IsChotSo = 1`)**, tham số trả về `1` (Giao diện hiển thị: `(DỮ LIỆU ĐÃ XÁC NHẬN)` màu xanh).
-   * Chỉ cần tồn tại tối thiểu 1 phiếu chưa được chốt sổ, tham số trả về `0` (Giao diện hiển thị: `(DỮ LIỆU CHƯA XÁC NHẬN)` màu đỏ).
+| Tên Field | Tên Cột Hiển Thị | Công Thức SQL Cụ Thể (Xích-ma Gia Quyền) |
+| :--- | :--- | :--- |
+| `NhapMua` | Nhập mua | `SUM(ISNULL(ct.SoLuongThucNhap, 0))` |
+| `NhapMua_AK` | AK % | `CASE WHEN SUM(ct.SoLuongThucNhap) <> 0 THEN SUM(ct.SoLuongThucNhap * ct.ChatLuongAk) / SUM(ct.SoLuongThucNhap) ELSE 0 END` |
+| `NhapMua_Vk` | Vk % | `CASE WHEN SUM(ct.SoLuongThucNhap) <> 0 THEN SUM(ct.SoLuongThucNhap * ct.V_PhanTram) / SUM(ct.SoLuongThucNhap) ELSE 0 END` |
+| `NhapNoiBo` | Nhập nội bộ | `SUM(CASE WHEN lenhNoiBo.Id IS NOT NULL THEN ISNULL(ct.SoLuongTheoAmThucTe, 0) ELSE 0 END)` |
+| `NhapNoiBo_AK` | AK % | `CASE WHEN SUM(Sản_lượng_nội_bộ) <> 0 THEN SUM(Sản_lượng_nội_bộ * ct.ChatLuongAk) / SUM(Sản_lượng_nội_bộ) ELSE 0 END` |
+
+### 2. Nhánh Nhập pha trộn (Từ CTE `NHAP_PHATRON`)
+* **Bảng nguồn chính:** `dbo.PHIEUNHAPKHO` (phieu) `INNER JOIN` `dbo.PHIEUNHAPKHO_HANGHOA` (ct)
+* **Điều kiện lọc nghiệp vụ:** Cờ chế biến `CAST(phieu.IsCheBien AS BIT) = 0` (Chỉ lấy các phiếu thuần pha trộn hằng ngày).
+
+| Tên Field | Tên Cột Hiển Thị | Công Thức SQL Cụ Thể (Xích-ma Gia Quyền) |
+| :--- | :--- | :--- |
+| `NhapPhaTron` | Nhập pha trộn | `SUM(CASE WHEN phieu.IsCheBien = 0 THEN ISNULL(ct.SoLuongThucNhap, 0) ELSE 0 END)` |
+| `NhapPhaTron_AK` | AK % | `CASE WHEN SUM(SL_PhaTron) <> 0 THEN SUM(SL_PhaTron * ct.ChatLuongAK) / SUM(SL_PhaTron) ELSE 0 END` |
+
+---
+
+## III. Khối Xuất Trong Kỳ (Dữ Liệu Tiêu Thụ Đầu Ra)
+
+### 1. Nhánh Xuất bán tiêu thụ (Từ CTE `XUAT_02VT`)
+* **Bảng nguồn chính:** `dbo.PHIEUXUATKHOTHAN_02VT` (phieu) `INNER JOIN` `dbo.PHIEUXUATKHOTHAN_02VT_CHITIET` (ct)
+
+| Tên Field | Tên Cột Hiển Thị | Công Thức SQL Cụ Thể (Xích-ma Gia Quyền) |
+| :--- | :--- | :--- |
+| `XuatBan` | Xuất bán | `SUM(ISNULL(ct.SoLuongThucXuat, 0))` |
+| `XuatBan_AK` | AK % | `CASE WHEN SUM(ct.SoLuongThucXuat) <> 0 THEN SUM(ct.SoLuongThucXuat * ct.ChatLuongAk) / SUM(ct.SoLuongThucXuat) ELSE 0 END` |
+| `XuatBan_Qk` | Qk (Cal/g) | `CASE WHEN SUM(ct.SoLuongThucXuat) <> 0 THEN SUM(ct.SoLuongThucXuat * ct.QKCal) / SUM(ct.SoLuongThucXuat) ELSE 0 END` |
+| `XuatBan_Vk` | Vk % | `CASE WHEN SUM(ct.SoLuongThucXuat) <> 0 THEN SUM(ct.SoLuongThucXuat * ct.V_PhanTram) / SUM(ct.SoLuongThucXuat) ELSE 0 END` |
+
+### 2. Nhánh Xuất nền pha trộn (Từ CTE `XUAT_PHATRON`)
+* **Bảng nguồn chính:** `dbo.PHIEUXUATKHO` (phieu) `INNER JOIN` `dbo.PHIEUXUATKHO_HANGHOA` (ct) (Than nền xuất đưa vào máng trộn).
+
+| Tên Field | Tên Cột Hiển Thị | Công Thức SQL Cụ Thể (Xích-ma Gia Quyền) |
+| :--- | :--- | :--- |
+| `XuatPhaTron` | Xuất pha trộn | `SUM(ISNULL(ct.SoLuongThucNhap, 0))` |
+| `XuatPhaTron_AK` | AK % | `CASE WHEN SUM(ct.SoLuongThucNhap) <> 0 THEN SUM(ct.SoLuongThucNhap * ct.ChatLuongAK) / SUM(ct.SoLuongThucNhap) ELSE 0 END` |
+
+---
+
+## IV. Khối Tổng Hợp & Cân Đối Toàn Diện (Tính Toán Cuối)
+Khối này không lấy dữ liệu trực tiếp từ bảng vật lý, mà thực hiện tính toán bắc cầu từ các khối CTE phía trên thông qua tập dữ liệu `TINHTOAN` và `TINHTOAN_AK`.
+
+| Tên Field Hệ Thống | Mô Tả Ý Nghĩa | Công Thức SQL / Phương Trình Cân Đối Toán Học |
+| :--- | :--- | :--- |
+| **`TongNhap`** | **Tổng sản lượng nhập** | `= NhapMua + NhapNoiBo + NhapPhaTron` |
+| **`TongNhap_AK`** | **AK% tổng khối nhập** | `= CASE WHEN TongNhap <> 0 THEN (NhapMua * NhapMua_AK + NhapNoiBo * NhapNoiBo_AK + NhapPhaTron * NhapPhaTron_AK) / TongNhap ELSE 0 END` |
+| `TongNhap_Vk` | Vk% tổng khối nhập | `= CASE WHEN TongNhap <> 0 THEN (NhapMua * NhapMua_Vk) / TongNhap ELSE 0 END` |
+| **`TongXuat`** | **Tổng sản lượng xuất** | `= XuatBan + XuatPhaTron` |
+| **`TongXuat_AK`** | **AK% tổng khối xuất** | `= CASE WHEN TongXuat <> 0 THEN (XuatBan * XuatBan_AK + XuatPhaTron * XuatPhaTron_AK) / TongXuat ELSE 0 END` |
+| `TongXuat_Vk` | Vk% tổng khối xuất | `= CASE WHEN TongXuat <> 0 THEN (XuatBan * XuatBan_Vk) / TongXuat ELSE 0 END` |
+| **`TonCuoiKy`** | **Sản lượng tồn cuối kỳ**| `= TonDauKy + TongNhap - TongXuat` |
+| **`TonCuoiKy_AK`**| **AK% tồn cuối kỳ** | `= CASE WHEN TonCuoiKy <> 0 THEN (TonDauKy * TonDauKy_AK + TongNhap * TongNhap_AK - TongXuat * TongXuat_AK) / TonCuoiKy ELSE 0 END` |
+| **`TonCuoiKy_Vk`**| **Vk% tồn cuối kỳ** | `= CASE WHEN TonCuoiKy <> 0 THEN (TonDauKy * TonDauKy_Vk + TongNhap * TongNhap_Vk - TongXuat * TongXuat_Vk) / TonCuoiKy ELSE 0 END` |
